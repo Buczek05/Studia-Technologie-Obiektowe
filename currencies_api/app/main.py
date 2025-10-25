@@ -91,8 +91,8 @@ def sync_currency_data(
     if start_date > end_date:
         raise HTTPException(status_code=400, detail="start_date must be before or equal to end_date")
 
-    if (end_date - start_date).days > 365:
-        raise HTTPException(status_code=400, detail="Date range too large. Maximum 365 days allowed.")
+    if (end_date - start_date).days > 31:
+        raise HTTPException(status_code=400, detail="Date range too large. Maximum 31 days allowed.")
 
     try:
         downloader = NBPCurrencyApiDownloader(session, start_date, end_date)

@@ -17,6 +17,7 @@ class NBPCurrencyApiDownloader:
         self.session = session
         self.exchange_tables: list[ExchangeTable] = []
         self.currency_rates: list[CurrencyRate] = []
+        self.new_table_rates_list: list[tuple[ExchangeTable, list[CurrencyRate]]] = []
         self.start_date = start_date
         self.end_date = end_date
         self.new_date: date
@@ -81,6 +82,7 @@ class NBPCurrencyApiDownloader:
     def _add_objects_for_new_exchange_table(self) -> None:
         exchange_table, currency_objects = self._get_day_download_data().to_objects(self.new_date)
         self.exchange_tables.append(exchange_table)
+        self.new_table_rates_list.append((exchange_table, currency_objects))
         self.currency_rates.extend(currency_objects)
 
     def _get_day_download_data(self) -> NBPDateResponseDTO:
@@ -95,21 +97,21 @@ class NBPCurrencyApiDownloader:
             self.session.add(exchange_table)
         self.session.flush()
 
-        for exchange_table in self.exchange_tables:
-            for rate in self.currency_rates:
-                if rate.exchange_table == exchange_table:
-                    if exchange_table.id is not None:
-                        rate.exchange_table_id = exchange_table.id
+        for exchange_table, rates in self.new_table_rates_list:
+            if exchange_table.id is not None:
+                for rate in rates:
+                    rate.exchange_table_id = exchange_table.id
 
         for rate in self.currency_rates:
-            existing = self.session.exec(
-                select(CurrencyRate).where(
-                    CurrencyRate.exchange_table_id == rate.exchange_table_id,
-                    CurrencyRate.currency == rate.currency,
-                )
-            ).first()
-            if not existing:
-                self.session.add(rate)
+            if rate.exchange_table_id is not None:
+                existing = self.session.exec(
+                    select(CurrencyRate).where(
+                        CurrencyRate.exchange_table_id == rate.exchange_table_id,
+                        CurrencyRate.currency == rate.currency,
+                    )
+                ).first()
+                if not existing:
+                    self.session.add(rate)
 
         self.session.commit()
         logger.debug(
